@@ -1,0 +1,18 @@
+product: custom-lambda-container
+description: This product deploys a code build project which build a customer lambda container.
+version: v1
+tags:
+  - Key: product-type
+    Value: cleanup
+publish_state: enabled
+mandatory: true
+portfolio:
+  MKZ: custom-products
+launches:
+  MKZ:
+    - deploy_name:
+      launch_state: enabled
+      deploy_to:
+        tags:
+          - tag: type:customlambdacontainer
+            regions: default_region
