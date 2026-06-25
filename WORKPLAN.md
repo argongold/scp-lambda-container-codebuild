@@ -8,13 +8,12 @@
 - **Parameters** to make the product configurable:
   - `ProjectName` — CodeBuild project name
   - `ECRRepositoryName` — target ECR repo for the built image
-  - `ImageTag` — tag strategy (e.g., `latest`, commit SHA)
   - `ComputeType` — CodeBuild compute size (`BUILD_GENERAL1_SMALL`, `MEDIUM`, `LARGE`)
   - `BuildImage` — CodeBuild managed image (e.g., `aws/codebuild/amazonlinux2-x86_64-standard:5.0`)
   - `BuildTimeout` — timeout in minutes
   - `LambdaFunctionName` — (optional) Lambda function to update after build
   - `EnvironmentVariables` — any extra env vars for the build
-  - `AwsNukeVersion` — version of aws-nuke to download (e.g., `v2.25.0`)
+  - `AwsNukeVersion` — version of aws-nuke to download (e.g., `v2.25.0`); also used as the container image tag
 
 > **Note:** No source repository parameters (`SourceRepository`, `SourceBranch`) are needed. The Dockerfile, bootstrap, and buildspec are not sourced from an external repo. The buildspec will be defined **inline** within the CodeBuild project resource.
 
@@ -66,8 +65,8 @@ Build phases:
   - Generate `Dockerfile` via heredoc
   - Generate `bootstrap` script via heredoc
   - Download aws-nuke package from S3
-- **build**: `docker build -t $IMAGE_URI .`
-- **post_build**: `docker push $IMAGE_URI`, optionally `aws lambda update-function-code`
+- **build**: `docker build -t $ECR_URI:$AWS_NUKE_VERSION .`
+- **post_build**: `docker push $ECR_URI:$AWS_NUKE_VERSION`, optionally `aws lambda update-function-code`
 
 > **Note:** Use quoted heredocs (`<<'EOF'`) to avoid variable expansion issues inside file content.
 
@@ -95,8 +94,8 @@ Build phases:
 | Decision | Options |
 |----------|---------|
 | Source type | No external repo — inline buildspec, no Dockerfile source |
-| Trigger mechanism | Manual, EventBridge on push, or scheduled |
-| Image tagging | `latest` only, commit SHA, semantic versioning |
+| Trigger mechanism | Manual — start CodeBuild after successful stack update |
+| Image tagging | Derived from `AwsNukeVersion` parameter (e.g., `v2.26.0`) |
 | Auto-deploy to Lambda | Yes (add `update-function-code`) or No (just push to ECR) |
 | VPC access | Needed if pulling private base images or accessing internal resources |
 | Multi-arch builds | Single platform or `docker buildx` for arm64 + x86_64 |
@@ -110,7 +109,6 @@ Build phases:
 | 1 | Template Metadata & Parameters | AWSTemplateFormatVersion & Description | ☐ |
 | 1 | Template Metadata & Parameters | ProjectName parameter | ☐ |
 | 1 | Template Metadata & Parameters | ECRRepositoryName parameter | ☐ |
-| 1 | Template Metadata & Parameters | ImageTag parameter | ☐ |
 | 1 | Template Metadata & Parameters | ComputeType parameter | ☐ |
 | 1 | Template Metadata & Parameters | BuildImage parameter | ☐ |
 | 1 | Template Metadata & Parameters | BuildTimeout parameter | ☐ |
