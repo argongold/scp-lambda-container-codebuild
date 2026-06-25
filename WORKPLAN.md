@@ -8,7 +8,7 @@
 - **Parameters** to make the product configurable:
   - `ProjectName` — CodeBuild project name → `aws-nuke-container`
   - `ECRRepositoryName` — target ECR repo for the built image → `aws-nuke`
-  - `ComputeType` — CodeBuild compute type → `EC2`
+  - `ComputeType` — CodeBuild compute type → `BUILD_GENERAL1_SMALL` (2 vCPU, 4 GiB)
   - `BuildImage` — CodeBuild managed image (e.g., `aws/codebuild/amazonlinux2-x86_64-standard:6.0`)
   - `BuildTimeout` — timeout in minutes → `60`
   - `LambdaFunctionName` — (optional) Lambda function to update after build
