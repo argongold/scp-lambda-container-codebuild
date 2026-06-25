@@ -128,8 +128,11 @@ phases:
 
 ### 6. Supporting Resources
 
+**Phase 1 (testing):**
 - **CloudWatch Log Group** (`AWS::Logs::LogGroup`) — with retention policy
-- **S3 Bucket** (`AWS::S3::Bucket`) — stores the aws-nuke package
+- **S3 Bucket** (`AWS::S3::Bucket`) — stores the aws-nuke package (manually uploaded)
+
+**Phase 2 (automation — add later):**
 - **Custom Resource (crhelper)** — Lambda-backed custom resource that downloads aws-nuke from GitHub releases and uploads to the S3 bucket on stack create/update
 - **Lambda Function for Custom Resource** (`AWS::Lambda::Function`) — runs the crhelper logic (download aws-nuke, upload to S3)
 - **IAM Role for Custom Resource Lambda** — permissions for S3 PutObject and internet access (to download from GitHub)
@@ -170,10 +173,11 @@ aws cloudformation deploy \
 ```
 
 **Test workflow:**
-1. Deploy stack → verify resources (S3 bucket, ECR repo, CodeBuild project, custom resource success)
-2. Manually trigger CodeBuild → verify image built and pushed to ECR with correct tag
-3. Iterate on template fixes → redeploy (`aws cloudformation deploy` handles updates)
-4. Once stable → publish as Service Catalog product
+1. Deploy stack → verify resources (S3 bucket, ECR repo, CodeBuild project)
+2. Manually upload aws-nuke to S3: `aws s3 cp aws-nuke-v3.65.0-linux-amd64.tar.gz s3://<bucket>/v3.65.0/aws-nuke-v3.65.0-linux-amd64.tar.gz`
+3. Manually trigger CodeBuild → verify image built and pushed to ECR with correct tag
+4. Iterate on template fixes → redeploy (`aws cloudformation deploy` handles updates)
+5. Once stable → add crhelper custom resource (Phase 2), then publish as Service Catalog product
 
 ---
 
@@ -218,8 +222,8 @@ aws cloudformation deploy \
 | 5 | Buildspec Configuration | post_build: docker push | ☐ |
 | 6 | Supporting Resources | CloudWatch Log Group | ☐ |
 | 6 | Supporting Resources | S3 Bucket for aws-nuke package | ☐ |
-| 6 | Supporting Resources | Custom Resource Lambda (crhelper) | ☐ |
-| 6 | Supporting Resources | IAM Role for Custom Resource Lambda | ☐ |
+| 6 | Supporting Resources | Custom Resource Lambda (crhelper) — Phase 2 | ☐ |
+| 6 | Supporting Resources | IAM Role for Custom Resource Lambda — Phase 2 | ☐ |
 | 7 | Outputs | CodeBuild project name/ARN | ☐ |
 | 7 | Outputs | ECR repository URI | ☐ |
 | 7 | Outputs | S3 bucket name | ☐ |
