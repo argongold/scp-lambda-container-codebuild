@@ -31,11 +31,16 @@ Parameters:
     Type: String
     Default: v3.65.0
     Description: Version of aws-nuke to download and use as the container image tag
+  BucketName:
+    Type: String
+    Default: aws-nuke-artifacts
+    Description: S3 bucket name for storing aws-nuke package
 
 Resources:
   S3Bucket:
     Type: AWS::S3::Bucket
     Properties:
+      BucketName: !Ref BucketName
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
