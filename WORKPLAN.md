@@ -9,11 +9,11 @@
   - `ProjectName` — CodeBuild project name
   - `ECRRepositoryName` — target ECR repo for the built image
   - `ComputeType` — CodeBuild compute size (`BUILD_GENERAL1_SMALL`, `MEDIUM`, `LARGE`)
-  - `BuildImage` — CodeBuild managed image (e.g., `aws/codebuild/amazonlinux2-x86_64-standard:5.0`)
+  - `BuildImage` — CodeBuild managed image (e.g., `aws/codebuild/amazonlinux2-x86_64-standard:6.0`)
   - `BuildTimeout` — timeout in minutes
   - `LambdaFunctionName` — (optional) Lambda function to update after build
   - `EnvironmentVariables` — any extra env vars for the build
-  - `AwsNukeVersion` — version of aws-nuke to download (e.g., `v2.25.0`); also used as the container image tag
+  - `AwsNukeVersion` — version of aws-nuke to download (e.g., `v3.65.0`); also used as the container image tag
 
 > **Note:** No source repository parameters (`SourceRepository`, `SourceBranch`) are needed. The Dockerfile, bootstrap, and buildspec are not sourced from an external repo. The buildspec will be defined **inline** within the CodeBuild project resource.
 
@@ -110,7 +110,7 @@ Deploy the template directly via CloudFormation (bypasses Service Catalog overhe
 aws cloudformation deploy \
   --template-file product.template.yaml \
   --stack-name test-lambda-container-codebuild \
-  --parameter-overrides ProjectName=test-build AwsNukeVersion=v2.25.0 ECRRepositoryName=test-aws-nuke \
+  --parameter-overrides ProjectName=test-build AwsNukeVersion=v3.65.0 ECRRepositoryName=test-aws-nuke \
   --capabilities CAPABILITY_IAM
 ```
 
