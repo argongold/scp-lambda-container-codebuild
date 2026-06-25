@@ -5,6 +5,7 @@
 ### 1. Template Metadata & Parameters
 
 - **AWSTemplateFormatVersion** / **Description**
+- **Transform**: `AWS::Serverless-2016-10-31`
 - **Parameters** to make the product configurable:
   - `ProjectName` — CodeBuild project name → `aws-nuke-container`
   - `ECRRepositoryName` — target ECR repo for the built image → `aws-nuke`
