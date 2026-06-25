@@ -102,6 +102,26 @@ Build phases:
 
 ---
 
+## Testing Strategy
+
+Deploy the template directly via CloudFormation (bypasses Service Catalog overhead for rapid iteration):
+
+```bash
+aws cloudformation deploy \
+  --template-file product.template.yaml \
+  --stack-name test-lambda-container-codebuild \
+  --parameter-overrides ProjectName=test-build AwsNukeVersion=v2.25.0 ECRRepositoryName=test-aws-nuke \
+  --capabilities CAPABILITY_IAM
+```
+
+**Test workflow:**
+1. Deploy stack → verify resources (S3 bucket, ECR repo, CodeBuild project, custom resource success)
+2. Manually trigger CodeBuild → verify image built and pushed to ECR with correct tag
+3. Iterate on template fixes → redeploy (`aws cloudformation deploy` handles updates)
+4. Once stable → publish as Service Catalog product
+
+---
+
 ## Implementation Checklist
 
 | # | Section | Item | Status |
