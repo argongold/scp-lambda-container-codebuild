@@ -32,11 +32,12 @@
 ### 3. ECR Repository
 
 - **ECRRepository** (`AWS::ECR::Repository`):
-  - Repository name
-  - Image scanning configuration
+  - Repository name → `aws-nuke`
+  - Image scanning configuration → default (scan on push)
+  - Image tag mutability → `MUTABLE`
   - Lifecycle policy (to limit untagged image retention)
-  - Encryption configuration
-  - Repository policy (who can pull the image)
+  - Encryption configuration → default (AES-256)
+  - Repository policy → allow `lambda.amazonaws.com` to pull images
 
 ### 4. CodeBuild Project
 
