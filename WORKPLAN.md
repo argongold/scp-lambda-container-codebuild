@@ -62,12 +62,70 @@ The buildspec is defined inline in the CodeBuild project's `BuildSpec` property.
 
 Build phases:
 - **pre_build**:
+  - Construct ECR_REPO URI from env vars
   - ECR login (`aws ecr get-login-password`)
-  - Generate `Dockerfile` via heredoc
+  - Download aws-nuke binary from S3
+- **build**:
+  - Generate `Dockerfile` via heredoc (uses `COPY` for aws-nuke binary)
   - Generate `bootstrap` script via heredoc
-  - Download aws-nuke package from S3
-- **build**: `docker build -t $ECR_URI:$AWS_NUKE_VERSION .`
-- **post_build**: `docker push $ECR_URI:$AWS_NUKE_VERSION`, optionally `aws lambda update-function-code`
+  - `docker build -t $ECR_REPO:$AWS_NUKE_VERSION .`
+- **post_build**: `docker push $ECR_REPO:$AWS_NUKE_VERSION`
+
+**Inline buildspec:**
+
+```yaml
+version: 0.2
+
+env:
+  variables:
+    AWS_ACCOUNT_ID: ""
+    AWS_DEFAULT_REGION: ""
+    ECR_REPOSITORY_NAME: ""
+    AWS_NUKE_VERSION: ""
+    S3_BUCKET: ""
+
+phases:
+  pre_build:
+    commands:
+      - ECR_REPO=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPOSITORY_NAME
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPO
+      - aws s3 cp s3://$S3_BUCKET/$AWS_NUKE_VERSION/aws-nuke .
+      - chmod +x aws-nuke
+  build:
+    commands:
+      - |
+        cat > Dockerfile <<'EOF'
+        FROM public.ecr.aws/lambda/provided:al2023
+        RUN dnf install -y jq && dnf clean all
+        COPY aws-nuke /usr/local/bin/aws-nuke
+        COPY bootstrap ${LAMBDA_RUNTIME_DIR}/bootstrap
+        RUN chmod 755 ${LAMBDA_RUNTIME_DIR}/bootstrap
+        CMD ["handler"]
+        EOF
+      - |
+        cat > bootstrap <<'EOF'
+        #!/bin/bash
+        set -euo pipefail
+        while true; do
+          HEADERS="$(mktemp)"
+          EVENT_DATA=$(curl -sS -LD "$HEADERS" "http://${AWS_LAMBDA_RUNTIME_API}/2018-06-01/runtime/invocation/next")
+          REQUEST_ID=$(grep -Fi Lambda-Runtime-Aws-Request-Id "$HEADERS" | tr -d '[:space:]' | cut -d: -f2)
+          NO_DRY_RUN=$(echo "$EVENT_DATA" | jq -r '.no_dry_run // "false"')
+          NUKE_CMD="aws-nuke run --config /var/task/nuke-config.yaml --no-prompt --no-alias-check"
+          if [ "$NO_DRY_RUN" = "true" ]; then
+            NUKE_CMD="$NUKE_CMD --no-dry-run"
+          fi
+          echo "=== aws-nuke run (no_dry_run=$NO_DRY_RUN) ==="
+          RESPONSE=$($NUKE_CMD 2>&1 | tee /dev/stderr || true)
+          curl -sS -X POST "http://${AWS_LAMBDA_RUNTIME_API}/2018-06-01/runtime/invocation/$REQUEST_ID/response" -d "$RESPONSE"
+        done
+        EOF
+      - chmod +x bootstrap
+      - docker build -t $ECR_REPO:$AWS_NUKE_VERSION .
+  post_build:
+    commands:
+      - docker push $ECR_REPO:$AWS_NUKE_VERSION
+```
 
 > **Note:** Use quoted heredocs (`<<'EOF'`) to avoid variable expansion issues inside file content.
 
@@ -159,13 +217,13 @@ aws cloudformation deploy \
 | 4 | CodeBuild Project | TimeoutInMinutes | ☐ |
 | 4 | CodeBuild Project | VpcConfig (optional) | ☐ |
 | 4 | CodeBuild Project | Cache configuration (optional) | ☐ |
+| 5 | Buildspec Configuration | pre_build: Construct ECR_REPO URI | ☐ |
 | 5 | Buildspec Configuration | pre_build: ECR login | ☐ |
-| 5 | Buildspec Configuration | pre_build: Generate Dockerfile via heredoc | ☐ |
-| 5 | Buildspec Configuration | pre_build: Generate bootstrap script via heredoc | ☐ |
 | 5 | Buildspec Configuration | pre_build: Download aws-nuke from S3 | ☐ |
-| 5 | Buildspec Configuration | build: docker build | ☐ |
+| 5 | Buildspec Configuration | build: Generate Dockerfile via heredoc | ☐ |
+| 5 | Buildspec Configuration | build: Generate bootstrap script via heredoc | ☐ |
+| 5 | Buildspec Configuration | build: docker build with $AWS_NUKE_VERSION tag | ☐ |
 | 5 | Buildspec Configuration | post_build: docker push | ☐ |
-| 5 | Buildspec Configuration | post_build: Lambda update (optional) | ☐ |
 | 6 | Supporting Resources | CloudWatch Log Group | ☐ |
 | 6 | Supporting Resources | S3 Bucket for aws-nuke package | ☐ |
 | 6 | Supporting Resources | Custom Resource Lambda (crhelper) | ☐ |
