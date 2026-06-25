@@ -7,8 +7,6 @@
 - **AWSTemplateFormatVersion** / **Description**
 - **Parameters** to make the product configurable:
   - `ProjectName` — CodeBuild project name
-  - `SourceRepository` — Git repo URL (CodeCommit or GitHub) containing the Dockerfile
-  - `SourceBranch` — branch to build from
   - `ECRRepositoryName` — target ECR repo for the built image
   - `ImageTag` — tag strategy (e.g., `latest`, commit SHA)
   - `ComputeType` — CodeBuild compute size (`BUILD_GENERAL1_SMALL`, `MEDIUM`, `LARGE`)
@@ -16,18 +14,21 @@
   - `BuildTimeout` — timeout in minutes
   - `LambdaFunctionName` — (optional) Lambda function to update after build
   - `EnvironmentVariables` — any extra env vars for the build
+  - `AwsNukeVersion` — version of aws-nuke to download (e.g., `v2.25.0`)
+
+> **Note:** No source repository parameters (`SourceRepository`, `SourceBranch`) are needed. The Dockerfile, bootstrap, and buildspec are not sourced from an external repo. The buildspec will be defined **inline** within the CodeBuild project resource.
 
 ### 2. IAM Role for CodeBuild
 
 - **CodeBuildServiceRole** (`AWS::IAM::Role`):
   - Trust policy allowing `codebuild.amazonaws.com`
+  - Compute type: EC2
   - Permissions for:
     - ECR: `GetAuthorizationToken`, `BatchCheckLayerAvailability`, `PutImage`, `InitiateLayerUpload`, `UploadLayerPart`, `CompleteLayerUpload`
     - CloudWatch Logs: `CreateLogGroup`, `CreateLogStream`, `PutLogEvents`
-    - S3: access to artifacts bucket (if needed)
-    - CodeCommit or connection: `GitPull` permissions
+    - S3: `GetObject` — to download aws-nuke package
+    - SSM Parameter Store: `GetParameter`, `GetParameters` — to retrieve build configuration/secrets
     - Lambda: `UpdateFunctionCode` (if auto-deploying)
-    - (Optional) Secrets Manager / SSM for build secrets
 
 ### 3. ECR Repository
 
@@ -41,7 +42,7 @@
 ### 4. CodeBuild Project
 
 - **CodeBuildProject** (`AWS::CodeBuild::Project`):
-  - **Source**: type (CODECOMMIT, GITHUB, S3), location, buildspec (inline or file reference)
+  - **Source**: type `NO_SOURCE`, buildspec inline
   - **Environment**:
     - Type: `LINUX_CONTAINER`
     - ComputeType
@@ -55,20 +56,30 @@
   - **VpcConfig** (optional — if source or base images are in a VPC)
   - **Cache** (optional — local Docker layer caching for faster builds)
 
-### 5. Buildspec Configuration (inline or referenced)
+### 5. Buildspec Configuration (inline in CloudFormation template)
 
-Define the build phases:
-- **pre_build**: ECR login (`aws ecr get-login-password`)
+The buildspec is defined inline in the CodeBuild project's `BuildSpec` property. It generates the `Dockerfile` and `bootstrap` script dynamically using heredocs, then builds and pushes the container image.
+
+Build phases:
+- **pre_build**:
+  - ECR login (`aws ecr get-login-password`)
+  - Generate `Dockerfile` via heredoc
+  - Generate `bootstrap` script via heredoc
+  - Download aws-nuke package from S3
 - **build**: `docker build -t $IMAGE_URI .`
 - **post_build**: `docker push $IMAGE_URI`, optionally `aws lambda update-function-code`
 
-### 6. (Optional) Supporting Resources
+> **Note:** Use quoted heredocs (`<<'EOF'`) to avoid variable expansion issues inside file content.
+
+### 6. Supporting Resources
 
 - **CloudWatch Log Group** (`AWS::Logs::LogGroup`) — with retention policy
-- **S3 Bucket** — if using S3 source or caching
-- **EventBridge Rule / Trigger** — if you want builds triggered on code push
-- **SNS Topic** — for build notifications (success/failure)
-- **Lambda Permission** — if CodeBuild will invoke Lambda update
+- **S3 Bucket** (`AWS::S3::Bucket`) — stores the aws-nuke package
+- **Custom Resource (crhelper)** — Lambda-backed custom resource that downloads aws-nuke from GitHub releases and uploads to the S3 bucket on stack create/update
+- **Lambda Function for Custom Resource** (`AWS::Lambda::Function`) — runs the crhelper logic (download aws-nuke, upload to S3)
+- **IAM Role for Custom Resource Lambda** — permissions for S3 PutObject and internet access (to download from GitHub)
+- **SNS Topic** — (optional) for build notifications (success/failure)
+- **Lambda Permission** — (optional) if CodeBuild will invoke Lambda update
 
 ### 7. Outputs
 
@@ -83,7 +94,7 @@ Define the build phases:
 
 | Decision | Options |
 |----------|---------|
-| Source type | CodeCommit vs GitHub (via connection) vs S3 |
+| Source type | No external repo — inline buildspec, no Dockerfile source |
 | Trigger mechanism | Manual, EventBridge on push, or scheduled |
 | Image tagging | `latest` only, commit SHA, semantic versioning |
 | Auto-deploy to Lambda | Yes (add `update-function-code`) or No (just push to ECR) |
@@ -98,8 +109,6 @@ Define the build phases:
 |---|---------|------|--------|
 | 1 | Template Metadata & Parameters | AWSTemplateFormatVersion & Description | ☐ |
 | 1 | Template Metadata & Parameters | ProjectName parameter | ☐ |
-| 1 | Template Metadata & Parameters | SourceRepository parameter | ☐ |
-| 1 | Template Metadata & Parameters | SourceBranch parameter | ☐ |
 | 1 | Template Metadata & Parameters | ECRRepositoryName parameter | ☐ |
 | 1 | Template Metadata & Parameters | ImageTag parameter | ☐ |
 | 1 | Template Metadata & Parameters | ComputeType parameter | ☐ |
@@ -107,14 +116,14 @@ Define the build phases:
 | 1 | Template Metadata & Parameters | BuildTimeout parameter | ☐ |
 | 1 | Template Metadata & Parameters | LambdaFunctionName parameter | ☐ |
 | 1 | Template Metadata & Parameters | EnvironmentVariables parameter | ☐ |
+| 1 | Template Metadata & Parameters | AwsNukeVersion parameter | ☐ |
 | 2 | IAM Role for CodeBuild | CodeBuildServiceRole resource | ☐ |
 | 2 | IAM Role for CodeBuild | Trust policy for codebuild.amazonaws.com | ☐ |
 | 2 | IAM Role for CodeBuild | ECR permissions | ☐ |
 | 2 | IAM Role for CodeBuild | CloudWatch Logs permissions | ☐ |
-| 2 | IAM Role for CodeBuild | S3 permissions (if needed) | ☐ |
-| 2 | IAM Role for CodeBuild | Source repo permissions (CodeCommit/GitHub) | ☐ |
+| 2 | IAM Role for CodeBuild | S3 GetObject (download aws-nuke package) | ☐ |
+| 2 | IAM Role for CodeBuild | SSM Parameter Store permissions | ☐ |
 | 2 | IAM Role for CodeBuild | Lambda UpdateFunctionCode permission (optional) | ☐ |
-| 2 | IAM Role for CodeBuild | Secrets Manager / SSM permissions (optional) | ☐ |
 | 3 | ECR Repository | ECRRepository resource | ☐ |
 | 3 | ECR Repository | Image scanning configuration | ☐ |
 | 3 | ECR Repository | Lifecycle policy | ☐ |
@@ -132,12 +141,16 @@ Define the build phases:
 | 4 | CodeBuild Project | VpcConfig (optional) | ☐ |
 | 4 | CodeBuild Project | Cache configuration (optional) | ☐ |
 | 5 | Buildspec Configuration | pre_build: ECR login | ☐ |
+| 5 | Buildspec Configuration | pre_build: Generate Dockerfile via heredoc | ☐ |
+| 5 | Buildspec Configuration | pre_build: Generate bootstrap script via heredoc | ☐ |
+| 5 | Buildspec Configuration | pre_build: Download aws-nuke from S3 | ☐ |
 | 5 | Buildspec Configuration | build: docker build | ☐ |
 | 5 | Buildspec Configuration | post_build: docker push | ☐ |
 | 5 | Buildspec Configuration | post_build: Lambda update (optional) | ☐ |
 | 6 | Supporting Resources | CloudWatch Log Group | ☐ |
-| 6 | Supporting Resources | S3 Bucket (optional) | ☐ |
-| 6 | Supporting Resources | EventBridge Rule / Trigger (optional) | ☐ |
+| 6 | Supporting Resources | S3 Bucket for aws-nuke package | ☐ |
+| 6 | Supporting Resources | Custom Resource Lambda (crhelper) | ☐ |
+| 6 | Supporting Resources | IAM Role for Custom Resource Lambda | ☐ |
 | 6 | Supporting Resources | SNS Topic for notifications (optional) | ☐ |
 | 6 | Supporting Resources | Lambda Permission (optional) | ☐ |
 | 7 | Outputs | CodeBuild project name/ARN | ☐ |
