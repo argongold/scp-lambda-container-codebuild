@@ -11,8 +11,6 @@
   - `ComputeType` — CodeBuild compute type → `BUILD_GENERAL1_SMALL` (2 vCPU, 4 GiB)
   - `BuildImage` — CodeBuild managed image (e.g., `aws/codebuild/amazonlinux2-x86_64-standard:6.0`)
   - `BuildTimeout` — timeout in minutes → `60`
-  - `LambdaFunctionName` — (optional) Lambda function to update after build
-  - `EnvironmentVariables` — any extra env vars for the build
   - `AwsNukeVersion` — version of aws-nuke to download; also used as the container image tag → `v3.65.0`
 
 > **Note:** No source repository parameters (`SourceRepository`, `SourceBranch`) are needed. The Dockerfile, bootstrap, and buildspec are not sourced from an external repo. The buildspec will be defined **inline** within the CodeBuild project resource.
@@ -26,8 +24,6 @@
     - ECR: `GetAuthorizationToken`, `BatchCheckLayerAvailability`, `PutImage`, `InitiateLayerUpload`, `UploadLayerPart`, `CompleteLayerUpload`
     - CloudWatch Logs: `CreateLogGroup`, `CreateLogStream`, `PutLogEvents`
     - S3: `GetObject` — to download aws-nuke package
-    - SSM Parameter Store: `GetParameter`, `GetParameters` — to retrieve build configuration/secrets
-    - Lambda: `UpdateFunctionCode` (if auto-deploying)
 
 ### 3. ECR Repository
 
@@ -48,7 +44,7 @@
     - ComputeType
     - Image (managed or custom)
     - `PrivilegedMode: true` (required for Docker builds)
-    - Environment variables (ECR URI, AWS account ID, region, image tag)
+    - Environment variables (AWS_ACCOUNT_ID, AWS_DEFAULT_REGION, ECR_REPOSITORY_NAME, AWS_NUKE_VERSION, S3_BUCKET)
   - **Artifacts**: `NO_ARTIFACTS` (since output goes to ECR)
   - **ServiceRole**: reference to the IAM role
   - **LogsConfig**: CloudWatch log group/stream
@@ -137,13 +133,12 @@ phases:
 - **Custom Resource (crhelper)** — Lambda-backed custom resource that downloads aws-nuke from GitHub releases and uploads to the S3 bucket on stack create/update
 - **Lambda Function for Custom Resource** (`AWS::Lambda::Function`) — runs the crhelper logic (download aws-nuke, upload to S3)
 - **IAM Role for Custom Resource Lambda** — permissions for S3 PutObject and internet access (to download from GitHub)
-- **SNS Topic** — (optional) for build notifications (success/failure)
-- **Lambda Permission** — (optional) if CodeBuild will invoke Lambda update
 
 ### 7. Outputs
 
 - CodeBuild project name/ARN
 - ECR repository URI
+- S3 bucket name (aws-nuke package storage)
 - IAM role ARN
 - CloudWatch log group name
 
@@ -155,8 +150,8 @@ phases:
 |----------|---------|
 | Source type | No external repo — inline buildspec, no Dockerfile source |
 | Trigger mechanism | Manual — start CodeBuild after successful stack update |
-| Image tagging | Derived from `AwsNukeVersion` parameter (e.g., `v2.26.0`) |
-| Auto-deploy to Lambda | Yes (add `update-function-code`) or No (just push to ECR) |
+| Image tagging | Derived from `AwsNukeVersion` parameter (e.g., `v3.65.0`) |
+| Auto-deploy to Lambda | No (just push to ECR) — can be added later |
 | VPC access | Needed if pulling private base images or accessing internal resources |
 | Multi-arch builds | Single platform or `docker buildx` for arm64 + x86_64 |
 
@@ -192,16 +187,12 @@ aws cloudformation deploy \
 | 1 | Template Metadata & Parameters | ComputeType parameter | ☐ |
 | 1 | Template Metadata & Parameters | BuildImage parameter | ☐ |
 | 1 | Template Metadata & Parameters | BuildTimeout parameter | ☐ |
-| 1 | Template Metadata & Parameters | LambdaFunctionName parameter | ☐ |
-| 1 | Template Metadata & Parameters | EnvironmentVariables parameter | ☐ |
 | 1 | Template Metadata & Parameters | AwsNukeVersion parameter | ☐ |
 | 2 | IAM Role for CodeBuild | CodeBuildServiceRole resource | ☐ |
 | 2 | IAM Role for CodeBuild | Trust policy for codebuild.amazonaws.com | ☐ |
 | 2 | IAM Role for CodeBuild | ECR permissions | ☐ |
 | 2 | IAM Role for CodeBuild | CloudWatch Logs permissions | ☐ |
 | 2 | IAM Role for CodeBuild | S3 GetObject (download aws-nuke package) | ☐ |
-| 2 | IAM Role for CodeBuild | SSM Parameter Store permissions | ☐ |
-| 2 | IAM Role for CodeBuild | Lambda UpdateFunctionCode permission (optional) | ☐ |
 | 3 | ECR Repository | ECRRepository resource | ☐ |
 | 3 | ECR Repository | Image scanning configuration | ☐ |
 | 3 | ECR Repository | Lifecycle policy | ☐ |
@@ -229,9 +220,8 @@ aws cloudformation deploy \
 | 6 | Supporting Resources | S3 Bucket for aws-nuke package | ☐ |
 | 6 | Supporting Resources | Custom Resource Lambda (crhelper) | ☐ |
 | 6 | Supporting Resources | IAM Role for Custom Resource Lambda | ☐ |
-| 6 | Supporting Resources | SNS Topic for notifications (optional) | ☐ |
-| 6 | Supporting Resources | Lambda Permission (optional) | ☐ |
 | 7 | Outputs | CodeBuild project name/ARN | ☐ |
 | 7 | Outputs | ECR repository URI | ☐ |
+| 7 | Outputs | S3 bucket name | ☐ |
 | 7 | Outputs | IAM role ARN | ☐ |
 | 7 | Outputs | CloudWatch log group name | ☐ |
