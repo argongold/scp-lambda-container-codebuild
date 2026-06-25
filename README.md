@@ -30,6 +30,7 @@ CloudFormation Stack
 | `BuildImage` | `aws/codebuild/amazonlinux2-x86_64-standard:6.0` | CodeBuild managed image |
 | `BuildTimeout` | `60` | Timeout in minutes |
 | `AwsNukeVersion` | `v3.65.0` | aws-nuke version (also used as image tag) |
+| `ServiceCatalogAccountId` | *(required)* | AWS Account ID (used for S3 bucket naming) |
 
 ## Deployment
 
@@ -39,14 +40,14 @@ CloudFormation Stack
 aws cloudformation deploy \
   --template-file product.template.yaml \
   --stack-name test-lambda-container-codebuild \
-  --parameter-overrides ProjectName=aws-nuke-container AwsNukeVersion=v3.65.0 ECRRepositoryName=aws-nuke \
+  --parameter-overrides ProjectName=aws-nuke-container AwsNukeVersion=v3.65.0 ECRRepositoryName=aws-nuke ServiceCatalogAccountId=123456789012 \
   --capabilities CAPABILITY_IAM
 ```
 
 ### Upload aws-nuke package to S3
 
 ```bash
-aws s3 cp aws-nuke-v3.65.0-linux-amd64.tar.gz s3://<S3BucketName>/v3.65.0/aws-nuke-v3.65.0-linux-amd64.tar.gz
+aws s3 cp aws-nuke-v3.65.0-linux-amd64.tar.gz s3://123456789012-aws-nuke-artifacts/v3.65.0/aws-nuke-v3.65.0-linux-amd64.tar.gz
 ```
 
 ### Trigger CodeBuild

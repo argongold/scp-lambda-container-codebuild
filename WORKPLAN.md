@@ -13,6 +13,7 @@
   - `BuildImage` — CodeBuild managed image (e.g., `aws/codebuild/amazonlinux2-x86_64-standard:6.0`)
   - `BuildTimeout` — timeout in minutes → `60`
   - `AwsNukeVersion` — version of aws-nuke to download; also used as the container image tag → `v3.65.0`
+  - `ServiceCatalogAccountId` — AWS Account ID, used for S3 bucket naming (`<AccountId>-aws-nuke-artifacts`)
 
 > **Note:** No source repository parameters (`SourceRepository`, `SourceBranch`) are needed. The Dockerfile, bootstrap, and buildspec are not sourced from an external repo. The buildspec will be defined **inline** within the CodeBuild project resource.
 
@@ -169,13 +170,13 @@ Deploy the template directly via CloudFormation (bypasses Service Catalog overhe
 aws cloudformation deploy \
   --template-file product.template.yaml \
   --stack-name test-lambda-container-codebuild \
-  --parameter-overrides ProjectName=aws-nuke-container AwsNukeVersion=v3.65.0 ECRRepositoryName=aws-nuke \
+  --parameter-overrides ProjectName=aws-nuke-container AwsNukeVersion=v3.65.0 ECRRepositoryName=aws-nuke ServiceCatalogAccountId=123456789012 \
   --capabilities CAPABILITY_IAM
 ```
 
 **Test workflow:**
 1. Deploy stack → verify resources (S3 bucket, ECR repo, CodeBuild project)
-2. Manually upload aws-nuke to S3: `aws s3 cp aws-nuke-v3.65.0-linux-amd64.tar.gz s3://<bucket>/v3.65.0/aws-nuke-v3.65.0-linux-amd64.tar.gz`
+2. Manually upload aws-nuke to S3: `aws s3 cp aws-nuke-v3.65.0-linux-amd64.tar.gz s3://123456789012-aws-nuke-artifacts/v3.65.0/aws-nuke-v3.65.0-linux-amd64.tar.gz`
 3. Manually trigger CodeBuild → verify image built and pushed to ECR with correct tag
 4. Iterate on template fixes → redeploy (`aws cloudformation deploy` handles updates)
 5. Once stable → add crhelper custom resource (Phase 2), then publish as Service Catalog product
