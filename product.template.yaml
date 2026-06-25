@@ -31,16 +31,15 @@ Parameters:
     Type: String
     Default: v3.65.0
     Description: Version of aws-nuke to download and use as the container image tag
-  BucketName:
+  ServiceCatalogAccountId:
     Type: String
-    Default: aws-nuke-artifacts
-    Description: S3 bucket name for storing aws-nuke package
+    Description: AWS Account ID for the Service Catalog account
 
 Resources:
   S3Bucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Ref BucketName
+      BucketName: !Sub ${ServiceCatalogAccountId}-aws-nuke-artifacts
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
