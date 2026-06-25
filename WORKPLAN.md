@@ -186,47 +186,47 @@ aws cloudformation deploy \
 
 | # | Section | Item | Status |
 |---|---------|------|--------|
-| 1 | Template Metadata & Parameters | AWSTemplateFormatVersion & Description | ☐ |
-| 1 | Template Metadata & Parameters | ProjectName parameter | ☐ |
-| 1 | Template Metadata & Parameters | ECRRepositoryName parameter | ☐ |
-| 1 | Template Metadata & Parameters | ComputeType parameter | ☐ |
-| 1 | Template Metadata & Parameters | BuildImage parameter | ☐ |
-| 1 | Template Metadata & Parameters | BuildTimeout parameter | ☐ |
-| 1 | Template Metadata & Parameters | AwsNukeVersion parameter | ☐ |
-| 2 | IAM Role for CodeBuild | CodeBuildServiceRole resource | ☐ |
-| 2 | IAM Role for CodeBuild | Trust policy for codebuild.amazonaws.com | ☐ |
-| 2 | IAM Role for CodeBuild | ECR permissions | ☐ |
-| 2 | IAM Role for CodeBuild | CloudWatch Logs permissions | ☐ |
-| 2 | IAM Role for CodeBuild | S3 GetObject (download aws-nuke package) | ☐ |
-| 3 | ECR Repository | ECRRepository resource | ☐ |
-| 3 | ECR Repository | Image scanning configuration | ☐ |
-| 3 | ECR Repository | Lifecycle policy | ☐ |
-| 3 | ECR Repository | Encryption configuration | ☐ |
-| 3 | ECR Repository | Repository policy | ☐ |
-| 4 | CodeBuild Project | CodeBuildProject resource | ☐ |
-| 4 | CodeBuild Project | Source configuration | ☐ |
-| 4 | CodeBuild Project | Environment (type, compute, image) | ☐ |
-| 4 | CodeBuild Project | PrivilegedMode: true | ☐ |
-| 4 | CodeBuild Project | Environment variables | ☐ |
-| 4 | CodeBuild Project | Artifacts: NO_ARTIFACTS | ☐ |
-| 4 | CodeBuild Project | ServiceRole reference | ☐ |
-| 4 | CodeBuild Project | LogsConfig | ☐ |
-| 4 | CodeBuild Project | TimeoutInMinutes | ☐ |
+| 1 | Template Metadata & Parameters | AWSTemplateFormatVersion & Description | ✅ |
+| 1 | Template Metadata & Parameters | ProjectName parameter | ✅ |
+| 1 | Template Metadata & Parameters | ECRRepositoryName parameter | ✅ |
+| 1 | Template Metadata & Parameters | ComputeType parameter | ✅ |
+| 1 | Template Metadata & Parameters | BuildImage parameter | ✅ |
+| 1 | Template Metadata & Parameters | BuildTimeout parameter | ✅ |
+| 1 | Template Metadata & Parameters | AwsNukeVersion parameter | ✅ |
+| 2 | IAM Role for CodeBuild | CodeBuildServiceRole resource | ✅ |
+| 2 | IAM Role for CodeBuild | Trust policy for codebuild.amazonaws.com | ✅ |
+| 2 | IAM Role for CodeBuild | ECR permissions | ✅ |
+| 2 | IAM Role for CodeBuild | CloudWatch Logs permissions | ✅ |
+| 2 | IAM Role for CodeBuild | S3 GetObject (download aws-nuke package) | ✅ |
+| 3 | ECR Repository | ECRRepository resource | ✅ |
+| 3 | ECR Repository | Image scanning configuration | ✅ |
+| 3 | ECR Repository | Lifecycle policy | ✅ |
+| 3 | ECR Repository | Encryption configuration | ✅ |
+| 3 | ECR Repository | Repository policy | ✅ |
+| 4 | CodeBuild Project | CodeBuildProject resource | ✅ |
+| 4 | CodeBuild Project | Source configuration | ✅ |
+| 4 | CodeBuild Project | Environment (type, compute, image) | ✅ |
+| 4 | CodeBuild Project | PrivilegedMode: true | ✅ |
+| 4 | CodeBuild Project | Environment variables | ✅ |
+| 4 | CodeBuild Project | Artifacts: NO_ARTIFACTS | ✅ |
+| 4 | CodeBuild Project | ServiceRole reference | ✅ |
+| 4 | CodeBuild Project | LogsConfig | ✅ |
+| 4 | CodeBuild Project | TimeoutInMinutes | ✅ |
 | 4 | CodeBuild Project | VpcConfig (optional) | ☐ |
 | 4 | CodeBuild Project | Cache configuration (optional) | ☐ |
-| 5 | Buildspec Configuration | pre_build: Construct ECR_REPO URI | ☐ |
-| 5 | Buildspec Configuration | pre_build: ECR login | ☐ |
-| 5 | Buildspec Configuration | pre_build: Download aws-nuke from S3 | ☐ |
-| 5 | Buildspec Configuration | build: Generate Dockerfile via heredoc | ☐ |
-| 5 | Buildspec Configuration | build: Generate bootstrap script via heredoc | ☐ |
-| 5 | Buildspec Configuration | build: docker build with $AWS_NUKE_VERSION tag | ☐ |
-| 5 | Buildspec Configuration | post_build: docker push | ☐ |
-| 6 | Supporting Resources | CloudWatch Log Group | ☐ |
-| 6 | Supporting Resources | S3 Bucket for aws-nuke package | ☐ |
+| 5 | Buildspec Configuration | pre_build: Construct ECR_REPO URI | ✅ |
+| 5 | Buildspec Configuration | pre_build: ECR login | ✅ |
+| 5 | Buildspec Configuration | pre_build: Download aws-nuke from S3 | ✅ |
+| 5 | Buildspec Configuration | build: Generate Dockerfile via heredoc | ✅ |
+| 5 | Buildspec Configuration | build: Generate bootstrap script via heredoc | ✅ |
+| 5 | Buildspec Configuration | build: docker build with $AWS_NUKE_VERSION tag | ✅ |
+| 5 | Buildspec Configuration | post_build: docker push | ✅ |
+| 6 | Supporting Resources | CloudWatch Log Group | ✅ |
+| 6 | Supporting Resources | S3 Bucket for aws-nuke package | ✅ |
 | 6 | Supporting Resources | Custom Resource Lambda (crhelper) — Phase 2 | ☐ |
 | 6 | Supporting Resources | IAM Role for Custom Resource Lambda — Phase 2 | ☐ |
-| 7 | Outputs | CodeBuild project name/ARN | ☐ |
-| 7 | Outputs | ECR repository URI | ☐ |
-| 7 | Outputs | S3 bucket name | ☐ |
-| 7 | Outputs | IAM role ARN | ☐ |
-| 7 | Outputs | CloudWatch log group name | ☐ |
+| 7 | Outputs | CodeBuild project name/ARN | ✅ |
+| 7 | Outputs | ECR repository URI | ✅ |
+| 7 | Outputs | S3 bucket name | ✅ |
+| 7 | Outputs | IAM role ARN | ✅ |
+| 7 | Outputs | CloudWatch log group name | ✅ |
