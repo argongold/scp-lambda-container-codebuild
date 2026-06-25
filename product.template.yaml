@@ -1,0 +1,225 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Service Catalog Product - Lambda Container CodeBuild (builds aws-nuke container image)
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: aws-nuke-container
+    Description: CodeBuild project name
+  ECRRepositoryName:
+    Type: String
+    Default: aws-nuke
+    Description: ECR repository name for the built image
+  ComputeType:
+    Type: String
+    Default: BUILD_GENERAL1_SMALL
+    AllowedValues:
+      - BUILD_GENERAL1_SMALL
+      - BUILD_GENERAL1_MEDIUM
+      - BUILD_GENERAL1_LARGE
+    Description: CodeBuild compute type
+  BuildImage:
+    Type: String
+    Default: aws/codebuild/amazonlinux2-x86_64-standard:6.0
+    Description: CodeBuild managed image
+  BuildTimeout:
+    Type: Number
+    Default: 60
+    Description: Build timeout in minutes
+  AwsNukeVersion:
+    Type: String
+    Default: v3.65.0
+    Description: Version of aws-nuke to download and use as the container image tag
+
+Resources:
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  CloudWatchLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/codebuild/${ProjectName}
+      RetentionInDays: 30
+
+  ECRRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Ref ECRRepositoryName
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      ImageTagMutability: MUTABLE
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Remove untagged images after 7 days",
+                "selection": {
+                  "tagStatus": "untagged",
+                  "countType": "sinceImagePushed",
+                  "countUnit": "days",
+                  "countNumber": 7
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+      RepositoryPolicyText:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowLambdaPull
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action:
+              - ecr:BatchGetImage
+              - ecr:GetDownloadUrlForLayer
+
+  CodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CodeBuildPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ECRAuth
+                Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                Resource: '*'
+              - Sid: ECRPush
+                Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:PutImage
+                  - ecr:InitiateLayerUpload
+                  - ecr:UploadLayerPart
+                  - ecr:CompleteLayerUpload
+                Resource: !GetAtt ECRRepository.Arn
+              - Sid: CloudWatchLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !GetAtt CloudWatchLogGroup.Arn
+              - Sid: S3GetObject
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource: !Sub ${S3Bucket.Arn}/*
+
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Ref ProjectName
+      Description: Builds aws-nuke Lambda container image and pushes to ECR
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      TimeoutInMinutes: !Ref BuildTimeout
+      Source:
+        Type: NO_SOURCE
+        BuildSpec: |
+          version: 0.2
+          phases:
+            pre_build:
+              commands:
+                - ECR_REPO=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPOSITORY_NAME
+                - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPO
+                - aws s3 cp s3://$S3_BUCKET/$AWS_NUKE_VERSION/aws-nuke-$AWS_NUKE_VERSION-linux-amd64.tar.gz .
+                - tar xzf aws-nuke-$AWS_NUKE_VERSION-linux-amd64.tar.gz
+                - chmod +x aws-nuke
+            build:
+              commands:
+                - |
+                  cat > Dockerfile <<'EOF'
+                  FROM public.ecr.aws/lambda/provided:al2023
+                  RUN dnf install -y jq && dnf clean all
+                  COPY aws-nuke /usr/local/bin/aws-nuke
+                  COPY bootstrap ${LAMBDA_RUNTIME_DIR}/bootstrap
+                  RUN chmod 755 ${LAMBDA_RUNTIME_DIR}/bootstrap
+                  CMD ["handler"]
+                  EOF
+                - |
+                  cat > bootstrap <<'EOF'
+                  #!/bin/bash
+                  set -euo pipefail
+                  while true; do
+                    HEADERS="$(mktemp)"
+                    EVENT_DATA=$(curl -sS -LD "$HEADERS" "http://${AWS_LAMBDA_RUNTIME_API}/2018-06-01/runtime/invocation/next")
+                    REQUEST_ID=$(grep -Fi Lambda-Runtime-Aws-Request-Id "$HEADERS" | tr -d '[:space:]' | cut -d: -f2)
+                    NO_DRY_RUN=$(echo "$EVENT_DATA" | jq -r '.no_dry_run // "false"')
+                    NUKE_CMD="aws-nuke run --config /var/task/nuke-config.yaml --no-prompt --no-alias-check"
+                    if [ "$NO_DRY_RUN" = "true" ]; then
+                      NUKE_CMD="$NUKE_CMD --no-dry-run"
+                    fi
+                    echo "=== aws-nuke run (no_dry_run=$NO_DRY_RUN) ==="
+                    RESPONSE=$($NUKE_CMD 2>&1 | tee /dev/stderr || true)
+                    curl -sS -X POST "http://${AWS_LAMBDA_RUNTIME_API}/2018-06-01/runtime/invocation/$REQUEST_ID/response" -d "$RESPONSE"
+                  done
+                  EOF
+                - chmod +x bootstrap
+                - docker build -t $ECR_REPO:$AWS_NUKE_VERSION .
+            post_build:
+              commands:
+                - docker push $ECR_REPO:$AWS_NUKE_VERSION
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: !Ref ComputeType
+        Image: !Ref BuildImage
+        PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: AWS_ACCOUNT_ID
+            Value: !Ref AWS::AccountId
+          - Name: AWS_DEFAULT_REGION
+            Value: !Ref AWS::Region
+          - Name: ECR_REPOSITORY_NAME
+            Value: !Ref ECRRepositoryName
+          - Name: AWS_NUKE_VERSION
+            Value: !Ref AwsNukeVersion
+          - Name: S3_BUCKET
+            Value: !Ref S3Bucket
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+          GroupName: !Ref CloudWatchLogGroup
+
+Outputs:
+  CodeBuildProjectName:
+    Value: !Ref CodeBuildProject
+    Description: CodeBuild project name
+  CodeBuildProjectArn:
+    Value: !GetAtt CodeBuildProject.Arn
+    Description: CodeBuild project ARN
+  ECRRepositoryUri:
+    Value: !GetAtt ECRRepository.RepositoryUri
+    Description: ECR repository URI
+  S3BucketName:
+    Value: !Ref S3Bucket
+    Description: S3 bucket storing aws-nuke package
+  IAMRoleArn:
+    Value: !GetAtt CodeBuildServiceRole.Arn
+    Description: CodeBuild service role ARN
+  CloudWatchLogGroupName:
+    Value: !Ref CloudWatchLogGroup
+    Description: CloudWatch log group name
