@@ -89,7 +89,8 @@ phases:
     commands:
       - ECR_REPO=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPOSITORY_NAME
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPO
-      - aws s3 cp s3://$S3_BUCKET/$AWS_NUKE_VERSION/aws-nuke .
+      - aws s3 cp s3://$S3_BUCKET/$AWS_NUKE_VERSION/aws-nuke-$AWS_NUKE_VERSION-linux-amd64.tar.gz .
+      - tar xzf aws-nuke-$AWS_NUKE_VERSION-linux-amd64.tar.gz
       - chmod +x aws-nuke
   build:
     commands:
