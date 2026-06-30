@@ -93,6 +93,9 @@ Resources:
   CodeBuildServiceRole:
     Type: AWS::IAM::Role
     Properties:
+      Tags:
+        - Key: SCP-ALLOW-PLATFORM
+          Value: 'true'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:

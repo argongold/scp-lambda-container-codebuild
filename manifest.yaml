@@ -1,5 +1,5 @@
-product: custom-lambda-container
-description: This product deploys a code build project which build a customer lambda container.
+product: aws-nuke-container
+description: This product deploys a code build project which build a custom lambda container with aws-nuke backed-in.
 version: v1
 tags:
   - Key: product-type
